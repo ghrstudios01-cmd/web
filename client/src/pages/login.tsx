@@ -161,17 +161,6 @@ export default function LoginPage() {
               </Form>
             </CardContent>
           </Card>
-
-          <div className="mt-6 p-4 rounded-lg bg-muted/50">
-            <p className="text-sm text-muted-foreground text-center mb-2">
-              Comptes par defaut :
-            </p>
-            <div className="space-y-1 text-xs text-muted-foreground">
-              <p><strong>Enfant :</strong> enfant / noel2024</p>
-              <p><strong>Parent :</strong> parent / parent123</p>
-              <p><strong>Admin :</strong> admin / admin123</p>
-            </div>
-          </div>
         </div>
       </main>
 
