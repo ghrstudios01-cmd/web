@@ -315,6 +315,31 @@ export async function registerRoutes(
     }
   });
 
+  app.delete("/api/lists/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteList(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Liste non trouvee" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete list error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.get("/api/lists/sent/:username", async (req, res) => {
+    try {
+      const { username } = req.params;
+      const list = await storage.getListByUsername(username);
+      res.json(list || null);
+    } catch (error) {
+      console.error("Get sent list error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
   // Announcements routes
   app.get("/api/announcements", async (_req, res) => {
     try {

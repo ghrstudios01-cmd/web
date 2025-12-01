@@ -22,6 +22,9 @@ import {
   UserPlus,
   Clock,
   Key,
+  ChevronDown,
+  ChevronUp,
+  Package,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -131,6 +134,7 @@ export default function DeveloperSpacePage() {
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [showAccountPassword, setShowAccountPassword] = useState(false);
+  const [expandedLists, setExpandedLists] = useState<Set<string>>(new Set());
 
   const { data: lists = [], isLoading: loadingLists } = useQuery<WishList[]>({
     queryKey: ["/api/lists"],
@@ -262,6 +266,28 @@ export default function DeveloperSpacePage() {
       toast({ title: "Erreur", description: "Impossible de reinitialiser les listes", variant: "destructive" });
     },
   });
+
+  const deleteListMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/lists/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lists"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({ title: "Liste supprimee", description: "La liste a ete retiree" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer la liste", variant: "destructive" });
+    },
+  });
+
+  function toggleListExpansion(listId: string) {
+    const newExpanded = new Set(expandedLists);
+    if (newExpanded.has(listId)) {
+      newExpanded.delete(listId);
+    } else {
+      newExpanded.add(listId);
+    }
+    setExpandedLists(newExpanded);
+  }
 
   function handleLogout() {
     logout();
@@ -610,45 +636,133 @@ export default function DeveloperSpacePage() {
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Listes de Noel</h2>
 
-              <Card>
-                <CardContent className="p-0">
-                  {loadingLists ? (
-                    <div className="p-6 space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
-                      ))}
-                    </div>
-                  ) : lists.length === 0 ? (
-                    <div className="p-12 text-center">
-                      <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">Aucune liste recue</p>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nom</TableHead>
-                          <TableHead>Articles</TableHead>
-                          <TableHead>Date</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {lists.map((list) => (
-                          <TableRow key={list.id} data-testid={`row-list-${list.id}`}>
-                            <TableCell className="font-medium">{list.username}</TableCell>
-                            <TableCell>
-                              <Badge variant="secondary">
-                                {list.items.length} article{list.items.length !== 1 ? "s" : ""}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{formatDate(list.createdAt)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
+              {loadingLists ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-24 w-full" />
+                  ))}
+                </div>
+              ) : lists.length === 0 ? (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">Aucune liste recue</p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {lists.map((list) => {
+                    const isExpanded = expandedLists.has(list.id);
+                    return (
+                      <Card key={list.id} data-testid={`card-list-${list.id}`}>
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <div className="p-2 rounded-full bg-primary/10">
+                                <Gift className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <CardTitle className="text-lg">{list.username}</CardTitle>
+                                <CardDescription>
+                                  {list.items.length} article{list.items.length !== 1 ? "s" : ""} - {formatDate(list.createdAt)}
+                                </CardDescription>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => toggleListExpansion(list.id)}
+                                data-testid={`button-toggle-list-${list.id}`}
+                              >
+                                {isExpanded ? (
+                                  <ChevronUp className="h-5 w-5" />
+                                ) : (
+                                  <ChevronDown className="h-5 w-5" />
+                                )}
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    data-testid={`button-delete-list-${list.id}`}
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Supprimer la liste ?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Cette action est irreversible. La liste de "{list.username}" sera supprimee.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => deleteListMutation.mutate(list.id)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    >
+                                      Supprimer
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          </div>
+                        </CardHeader>
+                        {isExpanded && (
+                          <CardContent className="pt-0">
+                            <div className="border-t pt-4">
+                              {list.items.length === 0 ? (
+                                <p className="text-muted-foreground text-center py-4">Aucun article</p>
+                              ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                  {list.items.map((item) => (
+                                    <div
+                                      key={item.id}
+                                      className="flex gap-3 p-3 rounded-md bg-muted/50"
+                                      data-testid={`item-${item.id}`}
+                                    >
+                                      {(item.image || item.imageUrl) && (
+                                        <div className="w-16 h-16 rounded-md overflow-hidden shrink-0 bg-muted">
+                                          <img
+                                            src={item.image || item.imageUrl}
+                                            alt={item.title}
+                                            className="w-full h-full object-cover"
+                                            onError={(e) => {
+                                              (e.target as HTMLImageElement).style.display = "none";
+                                            }}
+                                          />
+                                        </div>
+                                      )}
+                                      <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                          <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                                          <span className="font-medium truncate">{item.title}</span>
+                                          <Badge variant="secondary" className="shrink-0">
+                                            x{item.quantity}
+                                          </Badge>
+                                        </div>
+                                        {item.description && (
+                                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                                            {item.description}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        )}
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 

@@ -16,6 +16,8 @@ import {
   X,
   Package,
   Sparkles,
+  CheckCircle2,
+  Clock,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -91,6 +93,16 @@ export default function UserSpacePage() {
     queryKey: ["/api/lists/current", username],
     queryFn: async () => {
       const res = await fetch(`/api/lists/current?username=${encodeURIComponent(username)}`);
+      if (!res.ok) throw new Error("Failed to fetch");
+      return res.json();
+    },
+    enabled: !!username,
+  });
+
+  const { data: sentList, isLoading: loadingSentList } = useQuery<WishList | null>({
+    queryKey: ["/api/lists/sent", username],
+    queryFn: async () => {
+      const res = await fetch(`/api/lists/sent/${encodeURIComponent(username)}`);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
@@ -180,6 +192,7 @@ export default function UserSpacePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lists/current", username] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lists/sent", username] });
       toast({
         title: "Liste envoyee !",
         description: "Votre liste de Noel a ete envoyee avec succes",
@@ -193,6 +206,16 @@ export default function UserSpacePage() {
       });
     },
   });
+
+  function formatDate(dateString: string) {
+    return new Date(dateString).toLocaleDateString("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
 
   function onSubmit(data: FormValues) {
     if (editingItem) {
@@ -569,6 +592,60 @@ export default function UserSpacePage() {
               </Button>
             </div>
           </>
+        )}
+
+        {sentList && (
+          <div className="mt-12 pt-8 border-t">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2 rounded-full bg-green-500/10">
+                <CheckCircle2 className="h-6 w-6 text-green-500" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">Ma liste envoyee</h2>
+                <p className="text-sm text-muted-foreground flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  Envoyee le {formatDate(sentList.createdAt)}
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {sentList.items.map((item) => {
+                const imageUrl = item.image || item.imageUrl || null;
+                return (
+                  <Card key={item.id} className="overflow-hidden" data-testid={`card-sent-item-${item.id}`}>
+                    {imageUrl && (
+                      <div className="aspect-video bg-muted overflow-hidden">
+                        <img
+                          src={imageUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).style.display = "none";
+                          }}
+                        />
+                      </div>
+                    )}
+                    <CardHeader className="pb-2">
+                      <div className="flex items-start justify-between gap-2">
+                        <CardTitle className="text-lg line-clamp-2">{item.title}</CardTitle>
+                        <Badge variant="secondary" className="shrink-0">
+                          x{item.quantity}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {item.description && (
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {item.description}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          </div>
         )}
       </main>
     </div>
