@@ -9,6 +9,8 @@ import {
   type InsertAnnouncement,
   type Config,
   type Stats,
+  type Account,
+  type InsertAccount,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import * as fs from "fs";
@@ -17,6 +19,7 @@ import * as path from "path";
 const DATA_DIR = path.join(process.cwd(), "data");
 const LISTS_FILE = path.join(DATA_DIR, "lists.json");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
+const ACCOUNTS_FILE = path.join(DATA_DIR, "accounts.json");
 const ANNOUNCEMENTS_FILE = path.join(DATA_DIR, "annonces.json");
 const CONFIG_FILE = path.join(process.cwd(), "config.json");
 
@@ -53,6 +56,15 @@ export interface IStorage {
   getConfig(): Promise<Config>;
   updatePasswords(passwords: Partial<Config>): Promise<Config>;
 
+  // Accounts (new authentication system)
+  getAccounts(): Promise<Account[]>;
+  getAccount(id: string): Promise<Account | undefined>;
+  getAccountByUsername(username: string): Promise<Account | undefined>;
+  authenticateAccount(username: string, password: string): Promise<Account | null>;
+  createAccount(account: InsertAccount): Promise<Account>;
+  updateAccount(id: string, account: Partial<InsertAccount>): Promise<Account | undefined>;
+  deleteAccount(id: string): Promise<boolean>;
+
   // Users
   getUsers(): Promise<User[]>;
   getUser(id: string): Promise<User | undefined>;
@@ -88,6 +100,7 @@ export interface IStorage {
 export class FileStorage implements IStorage {
   private lists: WishList[];
   private users: User[];
+  private accounts: Account[];
   private announcements: Announcement[];
   private config: Config;
 
@@ -95,6 +108,7 @@ export class FileStorage implements IStorage {
     ensureDataDir();
     this.lists = readJsonFile<WishList[]>(LISTS_FILE, []);
     this.users = readJsonFile<User[]>(USERS_FILE, []);
+    this.accounts = readJsonFile<Account[]>(ACCOUNTS_FILE, []);
     this.announcements = readJsonFile<Announcement[]>(ANNOUNCEMENTS_FILE, []);
     this.config = readJsonFile<Config>(CONFIG_FILE, {
       userPassword: "user123",
@@ -106,6 +120,38 @@ export class FileStorage implements IStorage {
     if (!fs.existsSync(CONFIG_FILE)) {
       writeJsonFile(CONFIG_FILE, this.config);
     }
+
+    // Create default admin account if no accounts exist
+    if (this.accounts.length === 0) {
+      const defaultAccounts: Account[] = [
+        {
+          id: randomUUID(),
+          username: "admin",
+          password: "admin123",
+          displayName: "Administrateur",
+          role: "developer",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: randomUUID(),
+          username: "parent",
+          password: "parent123",
+          displayName: "Parent",
+          role: "parent",
+          createdAt: new Date().toISOString(),
+        },
+        {
+          id: randomUUID(),
+          username: "enfant",
+          password: "noel2024",
+          displayName: "Mon Enfant",
+          role: "user",
+          createdAt: new Date().toISOString(),
+        },
+      ];
+      this.accounts = defaultAccounts;
+      this.saveAccounts();
+    }
   }
 
   private saveLists(): void {
@@ -114,6 +160,10 @@ export class FileStorage implements IStorage {
 
   private saveUsers(): void {
     writeJsonFile(USERS_FILE, this.users);
+  }
+
+  private saveAccounts(): void {
+    writeJsonFile(ACCOUNTS_FILE, this.accounts);
   }
 
   private saveAnnouncements(): void {
@@ -133,6 +183,55 @@ export class FileStorage implements IStorage {
     this.config = { ...this.config, ...passwords };
     this.saveConfig();
     return this.config;
+  }
+
+  // Account methods
+  async getAccounts(): Promise<Account[]> {
+    return this.accounts;
+  }
+
+  async getAccount(id: string): Promise<Account | undefined> {
+    return this.accounts.find((a) => a.id === id);
+  }
+
+  async getAccountByUsername(username: string): Promise<Account | undefined> {
+    return this.accounts.find((a) => a.username.toLowerCase() === username.toLowerCase());
+  }
+
+  async authenticateAccount(username: string, password: string): Promise<Account | null> {
+    const account = this.accounts.find(
+      (a) => a.username.toLowerCase() === username.toLowerCase() && a.password === password
+    );
+    return account || null;
+  }
+
+  async createAccount(insertAccount: InsertAccount): Promise<Account> {
+    const account: Account = {
+      ...insertAccount,
+      id: randomUUID(),
+      createdAt: new Date().toISOString(),
+    };
+    this.accounts.push(account);
+    this.saveAccounts();
+    return account;
+  }
+
+  async updateAccount(id: string, accountData: Partial<InsertAccount>): Promise<Account | undefined> {
+    const index = this.accounts.findIndex((a) => a.id === id);
+    if (index === -1) return undefined;
+
+    this.accounts[index] = { ...this.accounts[index], ...accountData };
+    this.saveAccounts();
+    return this.accounts[index];
+  }
+
+  async deleteAccount(id: string): Promise<boolean> {
+    const index = this.accounts.findIndex((a) => a.id === id);
+    if (index === -1) return false;
+
+    this.accounts.splice(index, 1);
+    this.saveAccounts();
+    return true;
   }
 
   // User methods
@@ -330,6 +429,7 @@ export class FileStorage implements IStorage {
       totalUsers: this.users.length,
       totalItems,
       totalAnnouncements: this.announcements.length,
+      totalAccounts: this.accounts.length,
     };
   }
 }

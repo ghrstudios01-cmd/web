@@ -5,7 +5,9 @@ import {
   insertUserSchema,
   insertAnnouncementSchema,
   insertWishListItemSchema,
+  insertAccountSchema,
   configSchema,
+  loginSchema,
 } from "@shared/schema";
 import { z } from "zod";
 
@@ -16,37 +18,107 @@ export async function registerRoutes(
   // Authentication
   app.post("/api/auth/login", async (req, res) => {
     try {
-      const { role, password, username } = req.body;
-
-      if (!role || !password) {
-        return res.status(400).json({ success: false, message: "Role et mot de passe requis" });
+      const result = loginSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ success: false, message: "Identifiant et mot de passe requis" });
       }
 
-      const config = await storage.getConfig();
-      let isValid = false;
+      const { username, password } = result.data;
+      const account = await storage.authenticateAccount(username, password);
 
-      switch (role) {
-        case "user":
-          isValid = password === config.userPassword;
-          break;
-        case "parent":
-          isValid = password === config.parentPassword;
-          break;
-        case "developer":
-          isValid = password === config.devPassword;
-          break;
-        default:
-          return res.status(400).json({ success: false, message: "Role invalide" });
+      if (!account) {
+        return res.status(401).json({ success: false, message: "Identifiant ou mot de passe incorrect" });
       }
 
-      if (!isValid) {
-        return res.status(401).json({ success: false, message: "Mot de passe incorrect" });
-      }
-
-      res.json({ success: true, role, username });
+      res.json({
+        success: true,
+        account: {
+          id: account.id,
+          username: account.username,
+          displayName: account.displayName,
+          role: account.role,
+        },
+      });
     } catch (error) {
       console.error("Login error:", error);
       res.status(500).json({ success: false, message: "Erreur serveur" });
+    }
+  });
+
+  // Accounts routes
+  app.get("/api/accounts", async (_req, res) => {
+    try {
+      const accounts = await storage.getAccounts();
+      // Don't return passwords
+      const safeAccounts = accounts.map(({ password, ...rest }) => rest);
+      res.json(safeAccounts);
+    } catch (error) {
+      console.error("Get accounts error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.post("/api/accounts", async (req, res) => {
+    try {
+      const result = insertAccountSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Donnees invalides", details: result.error });
+      }
+
+      // Check if username already exists
+      const existing = await storage.getAccountByUsername(result.data.username);
+      if (existing) {
+        return res.status(400).json({ error: "Cet identifiant existe deja" });
+      }
+
+      const account = await storage.createAccount(result.data);
+      const { password, ...safeAccount } = account;
+      res.status(201).json(safeAccount);
+    } catch (error) {
+      console.error("Create account error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.put("/api/accounts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const result = insertAccountSchema.partial().safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: "Donnees invalides" });
+      }
+
+      // Check if username already exists (if changing username)
+      if (result.data.username) {
+        const existing = await storage.getAccountByUsername(result.data.username);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ error: "Cet identifiant existe deja" });
+        }
+      }
+
+      const account = await storage.updateAccount(id, result.data);
+      if (!account) {
+        return res.status(404).json({ error: "Compte non trouve" });
+      }
+      const { password, ...safeAccount } = account;
+      res.json(safeAccount);
+    } catch (error) {
+      console.error("Update account error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
+    }
+  });
+
+  app.delete("/api/accounts/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const deleted = await storage.deleteAccount(id);
+      if (!deleted) {
+        return res.status(404).json({ error: "Compte non trouve" });
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Delete account error:", error);
+      res.status(500).json({ error: "Erreur serveur" });
     }
   });
 

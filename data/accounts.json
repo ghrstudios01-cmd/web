@@ -1,0 +1,26 @@
+[
+  {
+    "id": "e67f8909-2aed-47ad-8e4f-33d4156e4731",
+    "username": "admin",
+    "password": "admin123",
+    "displayName": "Administrateur",
+    "role": "developer",
+    "createdAt": "2025-12-01T17:59:23.457Z"
+  },
+  {
+    "id": "8343d4df-3712-4e46-87bb-e66288f061bb",
+    "username": "parent",
+    "password": "parent123",
+    "displayName": "Parent",
+    "role": "parent",
+    "createdAt": "2025-12-01T17:59:23.458Z"
+  },
+  {
+    "id": "cf07e726-3714-4fc2-8eeb-76d5426fd9ae",
+    "username": "enfant",
+    "password": "noel2024",
+    "displayName": "Mon Enfant",
+    "role": "user",
+    "createdAt": "2025-12-01T17:59:23.458Z"
+  }
+]

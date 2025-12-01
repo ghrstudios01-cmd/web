@@ -35,7 +35,7 @@ import type { WishList } from "@shared/schema";
 export default function ParentSpacePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { displayName, logout } = useAuth();
   const [selectedList, setSelectedList] = useState<WishList | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -103,7 +103,7 @@ export default function ParentSpacePage() {
                 Espace Parent
               </h1>
               <p className="text-sm text-muted-foreground">
-                Consultez les listes de la famille
+                Bienvenue, {displayName || "Parent"}
               </p>
             </div>
           </div>

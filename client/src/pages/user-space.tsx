@@ -70,7 +70,8 @@ type FormValues = z.infer<typeof formSchema>;
 export default function UserSpacePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { username, logout } = useAuth();
+  const { user, displayName, logout } = useAuth();
+  const username = user?.username || displayName;
   const [editingItem, setEditingItem] = useState<WishListItem | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [imageTab, setImageTab] = useState<"upload" | "url">("url");
@@ -242,7 +243,7 @@ export default function UserSpacePage() {
             <div>
               <h1 className="font-semibold text-lg leading-tight">Ma Liste de Noel</h1>
               <p className="text-sm text-muted-foreground">
-                Bienvenue, {username || "utilisateur"}
+                Bienvenue, {displayName || "utilisateur"}
               </p>
             </div>
           </div>

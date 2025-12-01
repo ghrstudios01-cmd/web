@@ -1,0 +1,17 @@
+[
+  {
+    "id": "3e79d914-bf06-4f59-8c01-2cd8721bb6bc",
+    "username": "theo",
+    "createdAt": "2025-12-01T17:50:41.597Z",
+    "items": [
+      {
+        "title": "test",
+        "description": "blabab",
+        "quantity": 1,
+        "image": "",
+        "imageUrl": "https://replit.com/@valleesportivef/UserParentDev",
+        "id": "9b09dd3a-c252-4fd1-bb33-4958cf6f504f"
+      }
+    ]
+  }
+]

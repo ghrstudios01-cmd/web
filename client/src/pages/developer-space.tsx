@@ -25,6 +25,8 @@ import {
   Bell,
   Mail,
   Clock,
+  Key,
+  Shield,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -69,6 +71,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/lib/auth-context";
@@ -77,15 +86,25 @@ import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   insertUserSchema,
   insertAnnouncementSchema,
+  insertAccountSchema,
   type User,
   type Announcement,
   type WishList,
   type Stats,
   type Config,
+  type UserRole,
 } from "@shared/schema";
 import { z } from "zod";
 
-type TabType = "users" | "lists" | "announcements" | "stats" | "settings";
+type TabType = "accounts" | "users" | "lists" | "announcements" | "stats" | "settings";
+
+type Account = {
+  id: string;
+  username: string;
+  displayName: string;
+  role: UserRole;
+  createdAt: string;
+};
 
 const userFormSchema = insertUserSchema.extend({
   username: z.string().min(1, "Le nom d'utilisateur est requis"),
@@ -97,22 +116,44 @@ const announcementFormSchema = insertAnnouncementSchema.extend({
   content: z.string().min(1, "Le contenu est requis"),
 });
 
+const accountFormSchema = insertAccountSchema.extend({
+  username: z.string().min(1, "L'identifiant est requis"),
+  password: z.string().min(1, "Le mot de passe est requis"),
+  displayName: z.string().min(1, "Le nom est requis"),
+  role: z.enum(["user", "parent", "developer"]),
+});
+
 const passwordFormSchema = z.object({
   userPassword: z.string().min(1, "Mot de passe utilisateur requis"),
   parentPassword: z.string().min(1, "Mot de passe parent requis"),
   devPassword: z.string().min(1, "Mot de passe developpeur requis"),
 });
 
+const roleLabels: Record<UserRole, string> = {
+  user: "Utilisateur",
+  parent: "Parent",
+  developer: "Developpeur",
+};
+
+const roleBadgeVariants: Record<UserRole, "default" | "secondary" | "outline"> = {
+  user: "secondary",
+  parent: "default",
+  developer: "outline",
+};
+
 export default function DeveloperSpacePage() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { logout } = useAuth();
+  const { displayName, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("stats");
   const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
+  const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
   const [showPasswords, setShowPasswords] = useState(false);
+  const [showAccountPassword, setShowAccountPassword] = useState(false);
 
   const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
     queryKey: ["/api/users"],
@@ -124,6 +165,10 @@ export default function DeveloperSpacePage() {
 
   const { data: announcements = [], isLoading: loadingAnnouncements } = useQuery<Announcement[]>({
     queryKey: ["/api/announcements"],
+  });
+
+  const { data: accounts = [], isLoading: loadingAccounts } = useQuery<Account[]>({
+    queryKey: ["/api/accounts"],
   });
 
   const { data: stats, isLoading: loadingStats } = useQuery<Stats>({
@@ -151,6 +196,16 @@ export default function DeveloperSpacePage() {
     },
   });
 
+  const accountForm = useForm<z.infer<typeof accountFormSchema>>({
+    resolver: zodResolver(accountFormSchema),
+    defaultValues: {
+      username: "",
+      password: "",
+      displayName: "",
+      role: "user",
+    },
+  });
+
   const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
     resolver: zodResolver(passwordFormSchema),
     defaultValues: {
@@ -165,6 +220,49 @@ export default function DeveloperSpacePage() {
           devPassword: config.devPassword,
         }
       : undefined,
+  });
+
+  // Account mutations
+  const createAccountMutation = useMutation({
+    mutationFn: (data: z.infer<typeof accountFormSchema>) =>
+      apiRequest("POST", "/api/accounts", data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      accountForm.reset();
+      setIsAccountDialogOpen(false);
+      toast({ title: "Compte cree", description: "Le compte a ete ajoute avec succes" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de creer le compte. L'identifiant existe peut-etre deja.", variant: "destructive" });
+    },
+  });
+
+  const updateAccountMutation = useMutation({
+    mutationFn: (data: z.infer<typeof accountFormSchema> & { id: string }) =>
+      apiRequest("PUT", `/api/accounts/${data.id}`, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      accountForm.reset();
+      setEditingAccount(null);
+      setIsAccountDialogOpen(false);
+      toast({ title: "Compte modifie", description: "Les modifications ont ete enregistrees" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de modifier le compte", variant: "destructive" });
+    },
+  });
+
+  const deleteAccountMutation = useMutation({
+    mutationFn: (id: string) => apiRequest("DELETE", `/api/accounts/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
+      toast({ title: "Compte supprime", description: "Le compte a ete retire" });
+    },
+    onError: () => {
+      toast({ title: "Erreur", description: "Impossible de supprimer le compte", variant: "destructive" });
+    },
   });
 
   // User mutations
@@ -291,6 +389,17 @@ export default function DeveloperSpacePage() {
     });
   }
 
+  function handleEditAccount(account: Account) {
+    setEditingAccount(account);
+    accountForm.reset({
+      username: account.username,
+      password: "",
+      displayName: account.displayName,
+      role: account.role,
+    });
+    setIsAccountDialogOpen(true);
+  }
+
   function handleEditUser(user: User) {
     setEditingUser(user);
     userForm.reset({
@@ -308,6 +417,15 @@ export default function DeveloperSpacePage() {
       isActive: announcement.isActive,
     });
     setIsAnnouncementDialogOpen(true);
+  }
+
+  function onAccountSubmit(data: z.infer<typeof accountFormSchema>) {
+    if (editingAccount) {
+      const updateData = data.password ? data : { ...data, password: undefined };
+      updateAccountMutation.mutate({ ...updateData, id: editingAccount.id } as z.infer<typeof accountFormSchema> & { id: string });
+    } else {
+      createAccountMutation.mutate(data);
+    }
   }
 
   function onUserSubmit(data: z.infer<typeof userFormSchema>) {
@@ -328,6 +446,7 @@ export default function DeveloperSpacePage() {
 
   const tabs: { id: TabType; label: string; icon: typeof Users }[] = [
     { id: "stats", label: "Statistiques", icon: BarChart3 },
+    { id: "accounts", label: "Comptes", icon: Key },
     { id: "users", label: "Utilisateurs", icon: Users },
     { id: "lists", label: "Listes", icon: Gift },
     { id: "announcements", label: "Annonces", icon: Megaphone },
@@ -336,13 +455,15 @@ export default function DeveloperSpacePage() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      {/* Sidebar */}
       <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
         <div className="p-4 border-b border-sidebar-border">
           <div className="flex items-center gap-2">
             <TreePine className="h-6 w-6 text-primary" />
             <span className="font-semibold">Admin Panel</span>
           </div>
+          <p className="text-sm text-muted-foreground mt-1">
+            Bienvenue, {displayName || "Admin"}
+          </p>
         </div>
 
         <nav className="flex-1 p-3 space-y-1">
@@ -384,7 +505,6 @@ export default function DeveloperSpacePage() {
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 overflow-auto">
         <header className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-border px-6 py-4">
           <div className="flex items-center justify-between">
@@ -396,7 +516,6 @@ export default function DeveloperSpacePage() {
         </header>
 
         <div className="p-6">
-          {/* Stats Tab */}
           {activeTab === "stats" && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Tableau de bord</h2>
@@ -416,8 +535,20 @@ export default function DeveloperSpacePage() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Card data-testid="stat-accounts">
+                    <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
+                      <CardTitle className="text-sm font-medium text-muted-foreground">
+                        Comptes
+                      </CardTitle>
+                      <Key className="h-4 w-4 text-chart-4" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl font-bold">{stats?.totalAccounts || 0}</div>
+                    </CardContent>
+                  </Card>
+
                   <Card data-testid="stat-lists">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         Listes totales
                       </CardTitle>
@@ -428,20 +559,8 @@ export default function DeveloperSpacePage() {
                     </CardContent>
                   </Card>
 
-                  <Card data-testid="stat-users">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
-                      <CardTitle className="text-sm font-medium text-muted-foreground">
-                        Utilisateurs
-                      </CardTitle>
-                      <Users className="h-4 w-4 text-chart-3" />
-                    </CardHeader>
-                    <CardContent>
-                      <div className="text-2xl font-bold">{stats?.totalUsers || 0}</div>
-                    </CardContent>
-                  </Card>
-
                   <Card data-testid="stat-items">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         Articles totaux
                       </CardTitle>
@@ -453,7 +572,7 @@ export default function DeveloperSpacePage() {
                   </Card>
 
                   <Card data-testid="stat-announcements">
-                    <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
                       <CardTitle className="text-sm font-medium text-muted-foreground">
                         Annonces
                       </CardTitle>
@@ -513,7 +632,111 @@ export default function DeveloperSpacePage() {
             </div>
           )}
 
-          {/* Users Tab */}
+          {activeTab === "accounts" && (
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold">Gestion des comptes</h2>
+                  <p className="text-muted-foreground">Creez et gerez les identifiants de connexion</p>
+                </div>
+                <Button
+                  onClick={() => {
+                    setEditingAccount(null);
+                    accountForm.reset({ username: "", password: "", displayName: "", role: "user" });
+                    setIsAccountDialogOpen(true);
+                  }}
+                  data-testid="button-add-account"
+                >
+                  <UserPlus className="h-4 w-4 mr-2" />
+                  Nouveau compte
+                </Button>
+              </div>
+
+              <Card>
+                <CardContent className="p-0">
+                  {loadingAccounts ? (
+                    <div className="p-6 space-y-3">
+                      {[1, 2, 3].map((i) => (
+                        <Skeleton key={i} className="h-12 w-full" />
+                      ))}
+                    </div>
+                  ) : accounts.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <Key className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">Aucun compte enregistre</p>
+                    </div>
+                  ) : (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Identifiant</TableHead>
+                          <TableHead>Nom affiche</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Date creation</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {accounts.map((account) => (
+                          <TableRow key={account.id} data-testid={`row-account-${account.id}`}>
+                            <TableCell className="font-medium">{account.username}</TableCell>
+                            <TableCell>{account.displayName}</TableCell>
+                            <TableCell>
+                              <Badge variant={roleBadgeVariants[account.role]}>
+                                {roleLabels[account.role]}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{formatDate(account.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  onClick={() => handleEditAccount(account)}
+                                  data-testid={`button-edit-account-${account.id}`}
+                                >
+                                  <Edit2 className="h-4 w-4" />
+                                </Button>
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      data-testid={`button-delete-account-${account.id}`}
+                                    >
+                                      <Trash2 className="h-4 w-4 text-destructive" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Supprimer le compte ?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Cette action est irreversible. Le compte "{account.username}" sera supprime.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Annuler</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => deleteAccountMutation.mutate(account.id)}
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                      >
+                                        Supprimer
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
           {activeTab === "users" && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
@@ -600,7 +823,7 @@ export default function DeveloperSpacePage() {
                                       <AlertDialogCancel>Annuler</AlertDialogCancel>
                                       <AlertDialogAction
                                         onClick={() => deleteUserMutation.mutate(user.id)}
-                                        className="bg-destructive text-destructive-foreground"
+                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                       >
                                         Supprimer
                                       </AlertDialogAction>
@@ -619,10 +842,9 @@ export default function DeveloperSpacePage() {
             </div>
           )}
 
-          {/* Lists Tab */}
           {activeTab === "lists" && (
             <div className="space-y-6">
-              <h2 className="text-2xl font-bold">Toutes les listes</h2>
+              <h2 className="text-2xl font-bold">Listes de Noel</h2>
 
               <Card>
                 <CardContent className="p-0">
@@ -635,13 +857,13 @@ export default function DeveloperSpacePage() {
                   ) : lists.length === 0 ? (
                     <div className="p-12 text-center">
                       <Gift className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">Aucune liste enregistree</p>
+                      <p className="text-muted-foreground">Aucune liste recue</p>
                     </div>
                   ) : (
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Utilisateur</TableHead>
+                          <TableHead>Nom</TableHead>
                           <TableHead>Articles</TableHead>
                           <TableHead>Date</TableHead>
                         </TableRow>
@@ -666,11 +888,10 @@ export default function DeveloperSpacePage() {
             </div>
           )}
 
-          {/* Announcements Tab */}
           {activeTab === "announcements" && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Gestion des annonces</h2>
+                <h2 className="text-2xl font-bold">Annonces</h2>
                 <Button
                   onClick={() => {
                     setEditingAnnouncement(null);
@@ -689,13 +910,13 @@ export default function DeveloperSpacePage() {
                   {loadingAnnouncements ? (
                     <div className="p-6 space-y-3">
                       {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-20 w-full" />
+                        <Skeleton key={i} className="h-16 w-full" />
                       ))}
                     </div>
                   ) : announcements.length === 0 ? (
                     <div className="p-12 text-center">
-                      <Bell className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">Aucune annonce publiee</p>
+                      <Megaphone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground">Aucune annonce</p>
                     </div>
                   ) : (
                     <div className="divide-y">
@@ -703,19 +924,21 @@ export default function DeveloperSpacePage() {
                         <div
                           key={announcement.id}
                           className="p-4 flex items-start justify-between gap-4"
-                          data-testid={`announcement-${announcement.id}`}
+                          data-testid={`row-announcement-${announcement.id}`}
                         >
-                          <div className="flex-1">
+                          <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-medium">{announcement.title}</h3>
+                              <h4 className="font-medium">{announcement.title}</h4>
                               <Badge variant={announcement.isActive ? "default" : "secondary"}>
                                 {announcement.isActive ? "Active" : "Inactive"}
                               </Badge>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-2">{announcement.content}</p>
-                            <span className="text-xs text-muted-foreground">
+                            <p className="text-sm text-muted-foreground line-clamp-2">
+                              {announcement.content}
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
                               {formatDate(announcement.createdAt)}
-                            </span>
+                            </p>
                           </div>
                           <div className="flex gap-2">
                             <Button
@@ -747,7 +970,7 @@ export default function DeveloperSpacePage() {
                                   <AlertDialogCancel>Annuler</AlertDialogCancel>
                                   <AlertDialogAction
                                     onClick={() => deleteAnnouncementMutation.mutate(announcement.id)}
-                                    className="bg-destructive text-destructive-foreground"
+                                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                   >
                                     Supprimer
                                   </AlertDialogAction>
@@ -764,7 +987,6 @@ export default function DeveloperSpacePage() {
             </div>
           )}
 
-          {/* Settings Tab */}
           {activeTab === "settings" && (
             <div className="space-y-6">
               <h2 className="text-2xl font-bold">Parametres</h2>
@@ -772,117 +994,11 @@ export default function DeveloperSpacePage() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Mots de passe
+                    <AlertTriangle className="h-5 w-5 text-destructive" />
+                    Zone dangereuse
                   </CardTitle>
                   <CardDescription>
-                    Configurez les mots de passe pour chaque espace
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Form {...passwordForm}>
-                    <form
-                      onSubmit={passwordForm.handleSubmit((data) =>
-                        updatePasswordsMutation.mutate(data)
-                      )}
-                      className="space-y-4"
-                    >
-                      <div className="flex items-center justify-end mb-4">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => setShowPasswords(!showPasswords)}
-                        >
-                          {showPasswords ? (
-                            <>
-                              <EyeOff className="h-4 w-4 mr-2" />
-                              Masquer
-                            </>
-                          ) : (
-                            <>
-                              <Eye className="h-4 w-4 mr-2" />
-                              Afficher
-                            </>
-                          )}
-                        </Button>
-                      </div>
-
-                      <FormField
-                        control={passwordForm.control}
-                        name="userPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Mot de passe Utilisateur</FormLabel>
-                            <FormControl>
-                              <Input
-                                type={showPasswords ? "text" : "password"}
-                                data-testid="input-user-password"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={passwordForm.control}
-                        name="parentPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Mot de passe Parent</FormLabel>
-                            <FormControl>
-                              <Input
-                                type={showPasswords ? "text" : "password"}
-                                data-testid="input-parent-password"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={passwordForm.control}
-                        name="devPassword"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Mot de passe Developpeur</FormLabel>
-                            <FormControl>
-                              <Input
-                                type={showPasswords ? "text" : "password"}
-                                data-testid="input-dev-password"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <Button
-                        type="submit"
-                        disabled={updatePasswordsMutation.isPending}
-                        data-testid="button-save-passwords"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {updatePasswordsMutation.isPending ? "Enregistrement..." : "Enregistrer"}
-                      </Button>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-
-              <Card className="border-destructive/50">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-destructive">
-                    <AlertTriangle className="h-5 w-5" />
-                    Zone de danger
-                  </CardTitle>
-                  <CardDescription>
-                    Actions irreversibles - a utiliser avec precaution
+                    Actions irreversibles sur les donnees
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -897,15 +1013,14 @@ export default function DeveloperSpacePage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Reinitialiser toutes les listes ?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Cette action est irreversible. Toutes les listes de Noel seront supprimees definitivement.
+                          Cette action est irreversible. Toutes les listes de Noel seront supprimees.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
                         <AlertDialogCancel>Annuler</AlertDialogCancel>
                         <AlertDialogAction
                           onClick={() => resetAllListsMutation.mutate()}
-                          className="bg-destructive text-destructive-foreground"
-                          data-testid="button-confirm-reset"
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                         >
                           Reinitialiser
                         </AlertDialogAction>
@@ -919,7 +1034,136 @@ export default function DeveloperSpacePage() {
         </div>
       </main>
 
-      {/* User Dialog */}
+      <Dialog open={isAccountDialogOpen} onOpenChange={(open) => {
+        setIsAccountDialogOpen(open);
+        if (!open) {
+          setEditingAccount(null);
+          accountForm.reset();
+        }
+      }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {editingAccount ? "Modifier le compte" : "Nouveau compte"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingAccount
+                ? "Modifiez les informations du compte"
+                : "Creez un nouveau compte avec identifiant et mot de passe"}
+            </DialogDescription>
+          </DialogHeader>
+          <Form {...accountForm}>
+            <form onSubmit={accountForm.handleSubmit(onAccountSubmit)} className="space-y-4">
+              <FormField
+                control={accountForm.control}
+                name="displayName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Nom affiche *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: Marie"
+                        data-testid="input-account-displayname"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={accountForm.control}
+                name="username"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Identifiant *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Ex: marie123"
+                        data-testid="input-account-username"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={accountForm.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Mot de passe {editingAccount ? "(laisser vide pour ne pas changer)" : "*"}
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type={showAccountPassword ? "text" : "password"}
+                          placeholder="Mot de passe"
+                          data-testid="input-account-password"
+                          {...field}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-0 top-0 h-full"
+                          onClick={() => setShowAccountPassword(!showAccountPassword)}
+                        >
+                          {showAccountPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                          ) : (
+                            <Eye className="h-4 w-4" />
+                          )}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={accountForm.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Role *</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-account-role">
+                          <SelectValue placeholder="Choisir un role" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="user">Utilisateur (enfant)</SelectItem>
+                        <SelectItem value="parent">Parent</SelectItem>
+                        <SelectItem value="developer">Developpeur (admin)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="outline">
+                    Annuler
+                  </Button>
+                </DialogClose>
+                <Button
+                  type="submit"
+                  disabled={createAccountMutation.isPending || updateAccountMutation.isPending}
+                  data-testid="button-save-account"
+                >
+                  {editingAccount ? "Modifier" : "Creer"}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isUserDialogOpen} onOpenChange={(open) => {
         setIsUserDialogOpen(open);
         if (!open) {
@@ -930,12 +1174,12 @@ export default function DeveloperSpacePage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingUser ? "Modifier l'utilisateur" : "Ajouter un utilisateur"}
+              {editingUser ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
             </DialogTitle>
             <DialogDescription>
               {editingUser
                 ? "Modifiez les informations de l'utilisateur"
-                : "Creez un nouveau compte utilisateur"}
+                : "Ajoutez un nouvel utilisateur au systeme"}
             </DialogDescription>
           </DialogHeader>
           <Form {...userForm}>
@@ -947,7 +1191,7 @@ export default function DeveloperSpacePage() {
                   <FormItem>
                     <FormLabel>Nom d'utilisateur *</FormLabel>
                     <FormControl>
-                      <Input data-testid="input-new-username" {...field} />
+                      <Input data-testid="input-user-username" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -960,7 +1204,7 @@ export default function DeveloperSpacePage() {
                   <FormItem>
                     <FormLabel>Email (optionnel)</FormLabel>
                     <FormControl>
-                      <Input type="email" data-testid="input-new-email" {...field} />
+                      <Input type="email" data-testid="input-user-email" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -985,7 +1229,6 @@ export default function DeveloperSpacePage() {
         </DialogContent>
       </Dialog>
 
-      {/* Announcement Dialog */}
       <Dialog open={isAnnouncementDialogOpen} onOpenChange={(open) => {
         setIsAnnouncementDialogOpen(open);
         if (!open) {

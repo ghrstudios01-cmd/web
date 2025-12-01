@@ -1,6 +1,21 @@
 import { z } from "zod";
 
-// Config schema for passwords
+// Account schema for authentication
+export const accountSchema = z.object({
+  id: z.string(),
+  username: z.string().min(1, "L'identifiant est requis"),
+  password: z.string().min(1, "Le mot de passe est requis"),
+  displayName: z.string().min(1, "Le nom est requis"),
+  role: z.enum(["user", "parent", "developer"]),
+  createdAt: z.string(),
+});
+
+export type Account = z.infer<typeof accountSchema>;
+
+export const insertAccountSchema = accountSchema.omit({ id: true, createdAt: true });
+export type InsertAccount = z.infer<typeof insertAccountSchema>;
+
+// Config schema for passwords (legacy - kept for backward compatibility)
 export const configSchema = z.object({
   userPassword: z.string(),
   parentPassword: z.string(),
@@ -66,6 +81,7 @@ export type InsertAnnouncement = z.infer<typeof insertAnnouncementSchema>;
 
 // Authentication schemas
 export const loginSchema = z.object({
+  username: z.string().min(1, "L'identifiant est requis"),
   password: z.string().min(1, "Le mot de passe est requis"),
 });
 
@@ -80,6 +96,7 @@ export const statsSchema = z.object({
   totalUsers: z.number(),
   totalItems: z.number(),
   totalAnnouncements: z.number(),
+  totalAccounts: z.number(),
 });
 
 export type Stats = z.infer<typeof statsSchema>;
