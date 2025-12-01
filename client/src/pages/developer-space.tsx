@@ -7,7 +7,6 @@ import {
   Settings,
   LogOut,
   TreePine,
-  Users,
   FileText,
   BarChart3,
   Cog,
@@ -17,16 +16,12 @@ import {
   Megaphone,
   Gift,
   AlertTriangle,
-  Save,
   RotateCcw,
   Eye,
   EyeOff,
   UserPlus,
-  Bell,
-  Mail,
   Clock,
   Key,
-  Shield,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,7 +29,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
   Form,
   FormControl,
@@ -84,19 +78,16 @@ import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
-  insertUserSchema,
   insertAnnouncementSchema,
   insertAccountSchema,
-  type User,
   type Announcement,
   type WishList,
   type Stats,
-  type Config,
   type UserRole,
 } from "@shared/schema";
 import { z } from "zod";
 
-type TabType = "accounts" | "users" | "lists" | "announcements" | "stats" | "settings";
+type TabType = "accounts" | "lists" | "announcements" | "stats" | "settings";
 
 type Account = {
   id: string;
@@ -105,11 +96,6 @@ type Account = {
   role: UserRole;
   createdAt: string;
 };
-
-const userFormSchema = insertUserSchema.extend({
-  username: z.string().min(1, "Le nom d'utilisateur est requis"),
-  email: z.string().email("Email invalide").optional().or(z.literal("")),
-});
 
 const announcementFormSchema = insertAnnouncementSchema.extend({
   title: z.string().min(1, "Le titre est requis"),
@@ -123,14 +109,8 @@ const accountFormSchema = insertAccountSchema.extend({
   role: z.enum(["user", "parent", "developer"]),
 });
 
-const passwordFormSchema = z.object({
-  userPassword: z.string().min(1, "Mot de passe utilisateur requis"),
-  parentPassword: z.string().min(1, "Mot de passe parent requis"),
-  devPassword: z.string().min(1, "Mot de passe developpeur requis"),
-});
-
 const roleLabels: Record<UserRole, string> = {
-  user: "Utilisateur",
+  user: "Enfant",
   parent: "Parent",
   developer: "Developpeur",
 };
@@ -146,18 +126,11 @@ export default function DeveloperSpacePage() {
   const { toast } = useToast();
   const { displayName, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("stats");
-  const [isUserDialogOpen, setIsUserDialogOpen] = useState(false);
   const [isAnnouncementDialogOpen, setIsAnnouncementDialogOpen] = useState(false);
   const [isAccountDialogOpen, setIsAccountDialogOpen] = useState(false);
-  const [editingUser, setEditingUser] = useState<User | null>(null);
   const [editingAnnouncement, setEditingAnnouncement] = useState<Announcement | null>(null);
   const [editingAccount, setEditingAccount] = useState<Account | null>(null);
-  const [showPasswords, setShowPasswords] = useState(false);
   const [showAccountPassword, setShowAccountPassword] = useState(false);
-
-  const { data: users = [], isLoading: loadingUsers } = useQuery<User[]>({
-    queryKey: ["/api/users"],
-  });
 
   const { data: lists = [], isLoading: loadingLists } = useQuery<WishList[]>({
     queryKey: ["/api/lists"],
@@ -173,18 +146,6 @@ export default function DeveloperSpacePage() {
 
   const { data: stats, isLoading: loadingStats } = useQuery<Stats>({
     queryKey: ["/api/stats"],
-  });
-
-  const { data: config } = useQuery<Config>({
-    queryKey: ["/api/config"],
-  });
-
-  const userForm = useForm<z.infer<typeof userFormSchema>>({
-    resolver: zodResolver(userFormSchema),
-    defaultValues: {
-      username: "",
-      email: "",
-    },
   });
 
   const announcementForm = useForm<z.infer<typeof announcementFormSchema>>({
@@ -206,23 +167,6 @@ export default function DeveloperSpacePage() {
     },
   });
 
-  const passwordForm = useForm<z.infer<typeof passwordFormSchema>>({
-    resolver: zodResolver(passwordFormSchema),
-    defaultValues: {
-      userPassword: config?.userPassword || "",
-      parentPassword: config?.parentPassword || "",
-      devPassword: config?.devPassword || "",
-    },
-    values: config
-      ? {
-          userPassword: config.userPassword,
-          parentPassword: config.parentPassword,
-          devPassword: config.devPassword,
-        }
-      : undefined,
-  });
-
-  // Account mutations
   const createAccountMutation = useMutation({
     mutationFn: (data: z.infer<typeof accountFormSchema>) =>
       apiRequest("POST", "/api/accounts", data),
@@ -265,50 +209,6 @@ export default function DeveloperSpacePage() {
     },
   });
 
-  // User mutations
-  const createUserMutation = useMutation({
-    mutationFn: (data: z.infer<typeof userFormSchema>) =>
-      apiRequest("POST", "/api/users", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      userForm.reset();
-      setIsUserDialogOpen(false);
-      toast({ title: "Utilisateur cree", description: "L'utilisateur a ete ajoute avec succes" });
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de creer l'utilisateur", variant: "destructive" });
-    },
-  });
-
-  const updateUserMutation = useMutation({
-    mutationFn: (data: z.infer<typeof userFormSchema> & { id: string }) =>
-      apiRequest("PUT", `/api/users/${data.id}`, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      userForm.reset();
-      setEditingUser(null);
-      setIsUserDialogOpen(false);
-      toast({ title: "Utilisateur modifie", description: "Les modifications ont ete enregistrees" });
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de modifier l'utilisateur", variant: "destructive" });
-    },
-  });
-
-  const deleteUserMutation = useMutation({
-    mutationFn: (id: string) => apiRequest("DELETE", `/api/users/${id}`),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/users"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stats"] });
-      toast({ title: "Utilisateur supprime", description: "L'utilisateur a ete retire" });
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de supprimer l'utilisateur", variant: "destructive" });
-    },
-  });
-
-  // Announcement mutations
   const createAnnouncementMutation = useMutation({
     mutationFn: (data: z.infer<typeof announcementFormSchema>) =>
       apiRequest("POST", "/api/announcements", data),
@@ -351,19 +251,6 @@ export default function DeveloperSpacePage() {
     },
   });
 
-  // Settings mutations
-  const updatePasswordsMutation = useMutation({
-    mutationFn: (data: z.infer<typeof passwordFormSchema>) =>
-      apiRequest("PUT", "/api/config/passwords", data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/config"] });
-      toast({ title: "Mots de passe mis a jour", description: "Les nouveaux mots de passe sont actifs" });
-    },
-    onError: () => {
-      toast({ title: "Erreur", description: "Impossible de mettre a jour les mots de passe", variant: "destructive" });
-    },
-  });
-
   const resetAllListsMutation = useMutation({
     mutationFn: () => apiRequest("DELETE", "/api/lists/reset"),
     onSuccess: () => {
@@ -400,15 +287,6 @@ export default function DeveloperSpacePage() {
     setIsAccountDialogOpen(true);
   }
 
-  function handleEditUser(user: User) {
-    setEditingUser(user);
-    userForm.reset({
-      username: user.username,
-      email: user.email || "",
-    });
-    setIsUserDialogOpen(true);
-  }
-
   function handleEditAnnouncement(announcement: Announcement) {
     setEditingAnnouncement(announcement);
     announcementForm.reset({
@@ -428,14 +306,6 @@ export default function DeveloperSpacePage() {
     }
   }
 
-  function onUserSubmit(data: z.infer<typeof userFormSchema>) {
-    if (editingUser) {
-      updateUserMutation.mutate({ ...data, id: editingUser.id });
-    } else {
-      createUserMutation.mutate(data);
-    }
-  }
-
   function onAnnouncementSubmit(data: z.infer<typeof announcementFormSchema>) {
     if (editingAnnouncement) {
       updateAnnouncementMutation.mutate({ ...data, id: editingAnnouncement.id });
@@ -444,10 +314,9 @@ export default function DeveloperSpacePage() {
     }
   }
 
-  const tabs: { id: TabType; label: string; icon: typeof Users }[] = [
+  const tabs: { id: TabType; label: string; icon: typeof BarChart3 }[] = [
     { id: "stats", label: "Statistiques", icon: BarChart3 },
     { id: "accounts", label: "Comptes", icon: Key },
-    { id: "users", label: "Utilisateurs", icon: Users },
     { id: "lists", label: "Listes", icon: Gift },
     { id: "announcements", label: "Annonces", icon: Megaphone },
     { id: "settings", label: "Parametres", icon: Cog },
@@ -718,111 +587,6 @@ export default function DeveloperSpacePage() {
                                       <AlertDialogCancel>Annuler</AlertDialogCancel>
                                       <AlertDialogAction
                                         onClick={() => deleteAccountMutation.mutate(account.id)}
-                                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                                      >
-                                        Supprimer
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
-
-          {activeTab === "users" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Gestion des utilisateurs</h2>
-                <Button
-                  onClick={() => {
-                    setEditingUser(null);
-                    userForm.reset();
-                    setIsUserDialogOpen(true);
-                  }}
-                  data-testid="button-add-user"
-                >
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Ajouter
-                </Button>
-              </div>
-
-              <Card>
-                <CardContent className="p-0">
-                  {loadingUsers ? (
-                    <div className="p-6 space-y-3">
-                      {[1, 2, 3].map((i) => (
-                        <Skeleton key={i} className="h-12 w-full" />
-                      ))}
-                    </div>
-                  ) : users.length === 0 ? (
-                    <div className="p-12 text-center">
-                      <Users className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">Aucun utilisateur enregistre</p>
-                    </div>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nom</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Date creation</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id} data-testid={`row-user-${user.id}`}>
-                            <TableCell className="font-medium">{user.username}</TableCell>
-                            <TableCell>
-                              {user.email ? (
-                                <span className="flex items-center gap-1">
-                                  <Mail className="h-3 w-3" />
-                                  {user.email}
-                                </span>
-                              ) : (
-                                <span className="text-muted-foreground">-</span>
-                              )}
-                            </TableCell>
-                            <TableCell>{formatDate(user.createdAt)}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => handleEditUser(user)}
-                                  data-testid={`button-edit-user-${user.id}`}
-                                >
-                                  <Edit2 className="h-4 w-4" />
-                                </Button>
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      size="icon"
-                                      data-testid={`button-delete-user-${user.id}`}
-                                    >
-                                      <Trash2 className="h-4 w-4 text-destructive" />
-                                    </Button>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Supprimer l'utilisateur ?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Cette action est irreversible. L'utilisateur "{user.username}" sera supprime.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Annuler</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => deleteUserMutation.mutate(user.id)}
                                         className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                       >
                                         Supprimer
@@ -1136,7 +900,7 @@ export default function DeveloperSpacePage() {
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="user">Utilisateur (enfant)</SelectItem>
+                        <SelectItem value="user">Enfant</SelectItem>
                         <SelectItem value="parent">Parent</SelectItem>
                         <SelectItem value="developer">Developpeur (admin)</SelectItem>
                       </SelectContent>
@@ -1157,71 +921,6 @@ export default function DeveloperSpacePage() {
                   data-testid="button-save-account"
                 >
                   {editingAccount ? "Modifier" : "Creer"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </Form>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isUserDialogOpen} onOpenChange={(open) => {
-        setIsUserDialogOpen(open);
-        if (!open) {
-          setEditingUser(null);
-          userForm.reset();
-        }
-      }}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
-              {editingUser ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
-            </DialogTitle>
-            <DialogDescription>
-              {editingUser
-                ? "Modifiez les informations de l'utilisateur"
-                : "Ajoutez un nouvel utilisateur au systeme"}
-            </DialogDescription>
-          </DialogHeader>
-          <Form {...userForm}>
-            <form onSubmit={userForm.handleSubmit(onUserSubmit)} className="space-y-4">
-              <FormField
-                control={userForm.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nom d'utilisateur *</FormLabel>
-                    <FormControl>
-                      <Input data-testid="input-user-username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={userForm.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email (optionnel)</FormLabel>
-                    <FormControl>
-                      <Input type="email" data-testid="input-user-email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="outline">
-                    Annuler
-                  </Button>
-                </DialogClose>
-                <Button
-                  type="submit"
-                  disabled={createUserMutation.isPending || updateUserMutation.isPending}
-                  data-testid="button-save-user"
-                >
-                  {editingUser ? "Modifier" : "Creer"}
                 </Button>
               </DialogFooter>
             </form>

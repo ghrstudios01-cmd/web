@@ -8,19 +8,11 @@
     "createdAt": "2025-12-01T17:59:23.457Z"
   },
   {
-    "id": "8343d4df-3712-4e46-87bb-e66288f061bb",
-    "username": "parent",
-    "password": "parent123",
-    "displayName": "Parent",
-    "role": "parent",
-    "createdAt": "2025-12-01T17:59:23.458Z"
-  },
-  {
-    "id": "cf07e726-3714-4fc2-8eeb-76d5426fd9ae",
-    "username": "enfant",
-    "password": "noel2024",
-    "displayName": "Mon Enfant",
-    "role": "user",
-    "createdAt": "2025-12-01T17:59:23.458Z"
+    "username": "Ryan_dev",
+    "password": "Rsg&0408",
+    "displayName": "Ryan",
+    "role": "developer",
+    "id": "7ac8e3d4-598f-4fb5-bf68-1ad0df898a27",
+    "createdAt": "2025-12-01T19:16:00.911Z"
   }
 ]
