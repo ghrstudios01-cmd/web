@@ -1,0 +1,158 @@
+« Crée un projet complet comprenant un site web avec trois espaces : Utilisateur, Parent et Développeur.
+Génère toute la structure du projet (HTML/CSS/JS OU React + Node.js, selon ce qui est le plus adapté).
+Voici les fonctionnalités détaillées à implémenter :
+
+🔐 1. Système d’authentification (3 accès différents)
+✔ Espace Utilisateur
+
+Page de connexion avec mot de passe.
+
+Si correct → afficher : “Bienvenue user”.
+
+Redirection vers l’espace liste de Noël.
+
+✔ Espace Parent
+
+Mot de passe parent distinct.
+
+Consultation de toutes les listes envoyées.
+
+✔ Espace Développeur
+
+Mot de passe développeur.
+
+Interface d’administration globale.
+
+→ Les mots de passe doivent être stockés dans un fichier de configuration (JSON)
+Exemple :
+
+{
+  "userPassword": "user123",
+  "parentPassword": "parent123",
+  "devPassword": "dev123"
+}
+
+🎄 2. Espace Utilisateur — Création de la Liste de Noël
+
+L’utilisateur doit pouvoir :
+
+Ajouter un article contenant :
+✔ titre
+✔ description (facultative)
+✔ quantité
+✔ image facultative (upload ou base64)
+✔ OU lien vers une image (facultatif)
+
+Modifier un article
+
+Supprimer un article
+
+Voir sa liste en temps réel
+
+Cliquer sur “Envoyer” pour sauvegarder la liste
+
+✔ Stockage
+
+Les listes doivent être enregistrées dans /data/lists.json
+
+Chaque liste contient :
+
+{
+  "id": "...",
+  "username": "...",
+  "createdAt": "...",
+  "items": [
+    { "title": "", "quantity": 1, "description": "", "image": "" }
+  ]
+}
+
+👪 3. Espace Parent — Lecture des listes
+
+Afficher toutes les listes enregistrées
+
+Ouvrir une liste pour voir son contenu détaillé
+
+Afficher les images ou liens si fournis
+
+Bouton pour télécharger la liste en JSON
+
+Interface propre et facile à lire.
+
+🛠️ 4. Espace Développeur — Back-office avancé
+
+Fonctionnalités demandées :
+
+✔ Gestion des utilisateurs
+
+ajouter un utilisateur
+
+modifier un utilisateur
+
+supprimer un utilisateur
+
+voir la liste complète des comptes
+
+✔ Gestion des annonces
+
+ajouter une annonce
+
+modifier une annonce
+
+supprimer une annonce
+
+stocker les annonces dans /data/annonces.json
+
+✔ Statistiques simples (facultatif mais apprécié)
+
+nombre total de listes
+
+nombre d’utilisateurs
+
+activités récentes
+
+✔ Paramètres
+
+pouvoir changer les mots de passe dans l’interface développeur
+
+bouton pour réinitialiser toutes les listes
+
+📁 5. Structure du projet attendue
+
+Replit doit générer :
+
+/public
+   index.html
+   styles.css
+   script.js
+/data
+   lists.json
+   users.json
+   annonces.json
+config.json
+server.js (ou main.py si backend Python)
+package.json
+README.md
+
+🎨 6. Design attendu
+
+Professionnel, simple, moderne
+
+Responsive
+
+Utilisation possible de TailwindCSS ou Bootstrap
+
+Interface propre et lisible
+
+🎯 7. Livrables attendus
+
+Merci de générer :
+
+Le code complet
+
+Tous les fichiers automatiquement
+
+Un serveur backend pour gérer les fichiers JSON (Node.js ou Python)
+
+Une documentation dans le README.md
+
+Un site 100% fonctionnel prêt à exécuter dans Replit
