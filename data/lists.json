@@ -1,0 +1,17 @@
+[
+  {
+    "id": "3af76eff-1edf-493b-a8ef-e1002194df53",
+    "username": "TestUser123",
+    "createdAt": "2025-12-01T16:07:06.952Z",
+    "items": [
+      {
+        "title": "Console PS5",
+        "description": "Nouvelle console Sony",
+        "quantity": 1,
+        "image": "",
+        "imageUrl": "",
+        "id": "9c23d135-b6f4-487b-bf3d-60006e7ded7f"
+      }
+    ]
+  }
+]
