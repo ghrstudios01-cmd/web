@@ -1,1 +1,9 @@
-[]
+[
+  {
+    "title": "Ouverture",
+    "content": "le site est actuellement ouvert",
+    "isActive": true,
+    "id": "a41359fd-ed24-493f-b003-a4097854358d",
+    "createdAt": "2025-12-01T19:58:44.924Z"
+  }
+]

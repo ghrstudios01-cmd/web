@@ -12,6 +12,7 @@ import { useAuth } from "@/lib/auth-context";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { loginSchema, type LoginInput } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
+import AnnouncementsList from "@/components/announcements-list";
 
 const roleRedirects = {
   user: "/user",
@@ -167,6 +168,10 @@ export default function LoginPage() {
               </Form>
             </CardContent>
           </Card>
+          {/* Announcements banner below login card */}
+          <div className="mt-6">
+            <AnnouncementsList />
+          </div>
         </div>
       </main>
 

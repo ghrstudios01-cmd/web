@@ -4,6 +4,7 @@ import { type Server } from "http";
 import viteConfig from "../vite.config";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { nanoid } from "nanoid";
 
 const viteLogger = createLogger();
@@ -35,12 +36,9 @@ export async function setupVite(server: Server, app: Express) {
     const url = req.originalUrl;
 
     try {
-      const clientTemplate = path.resolve(
-        import.meta.dirname,
-        "..",
-        "client",
-        "index.html",
-      );
+      // compute __dirname equivalent for ESM and resolve the client index
+      const __dirname = path.dirname(fileURLToPath(import.meta.url));
+      const clientTemplate = path.resolve(__dirname, "..", "client", "index.html");
 
       // always reload the index.html file from disk incase it changes
       let template = await fs.promises.readFile(clientTemplate, "utf-8");
