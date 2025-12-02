@@ -45,6 +45,18 @@ export async function registerRoutes(
     }
   });
 
+  // Debug endpoints (temporary)
+  app.get("/api/debug/accounts", async (_req, res) => {
+    try {
+      const accounts = await storage.getAccounts();
+      const safe = accounts.map(({ password, ...rest }) => rest);
+      res.json({ ok: true, accounts: safe });
+    } catch (error) {
+      console.error("Debug accounts error:", error);
+      res.status(500).json({ ok: false, error: "Server error" });
+    }
+  });
+
   // Accounts routes
   app.get("/api/accounts", async (_req, res) => {
     try {
