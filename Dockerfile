@@ -18,6 +18,8 @@ ENV NODE_ENV=production
 # Copy built app and package.json
 COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/package.json ./package.json
+# Copy data files so runtime has the same persisted data as the repo
+COPY --from=builder /app/data ./data
 
 # Install only production deps
 RUN npm ci --only=production --no-audit --no-fund || true
